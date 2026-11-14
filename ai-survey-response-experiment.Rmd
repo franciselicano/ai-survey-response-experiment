@@ -1,0 +1,675 @@
+---
+title: "The Effect of AI Authorship on Survey Response Rates: Experimental Design, Randomization, and Power Analysis"
+output:
+  pdf_document:
+    toc: false
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+
+library(tidyverse)
+library(knitr)
+```
+
+
+## Background
+
+The experiment examines whether AI authorship affects survey response rates. AI assistance may improve message clarity and persuasiveness while reducing the effort required to compose messages. At the same time, human-authored communication may be perceived as more authentic or personal. These competing mechanisms make the effect of AI authorship on survey participation an empirical question.
+
+Published research suggests that AI involvement can affect how messages are perceived and how recipients respond. Hohenstein and Jung (2020) found that AI-generated messaging suggestions can influence interpersonal trust, suggesting that AI involvement can affect a recipient's perception of a message. Purcell et al. (2025) examined AI-assisted writing and found that messaging created with the use of AI resulted in "greater warmth, complexity, and clout" than human-created messaging. Motivated by this literature, we hypothesize that an AI-authored survey invitation may produce a higher response rate than a human-authored invitation, while recognizing that the direction and magnitude of the effect remain uncertain.
+
+
+## Experiment Design
+
+We plan to conduct a two-arm cluster-randomized experiment using two versions of a survey invitation: one human-authored (control) and one AI-authored (treatment). Both versions will invite students to complete the same survey about their preferred class times.
+
+The experiment will use MIDS and MICS cohort Slack channels from Spring 2023 through Fall 2026. The experiment includes 24 cohort Slack channels: 12 MIDS channels and 12 MICS channels. The cohort Slack channel is the unit of randomization because all students within a given cohort channel receive the same survey invitation.
+
+Channels are blocked by program and cohort recency. Within MIDS, adjacent cohorts are matched into six pairs based on recency; the same procedure is used within MICS, producing 12 matched pairs in total. Within each matched pair, one Slack channel is randomly assigned to receive the AI-authored survey invitation (treatment) and the other is randomly assigned to receive the human-authored survey invitation (control).
+
+Matching by program and cohort recency is intended to reduce potential imbalances between treatment conditions. In particular, cohorts that entered the program at different times may differ in current enrollment status or level of engagement with their Slack cohort channels, which could affect their likelihood of responding to the survey.
+
+Each cohort channel will receive two survey messages over the two-week response period: an initial invitation and a follow-up message one week later. Cohorts assigned to the control condition will receive a human-authored initial invitation and human-authored follow-up, while cohorts assigned to the treatment condition will receive an AI-authored initial invitation and AI-authored follow-up.
+
+To minimize differences between treatment conditions other than message authorship, one designated member of the research team will send all Slack messages. Messages will be scheduled in advance so that all cohort channels receive the initial invitation at the same time and the follow-up message at the same time one week later.
+
+Two weeks after distribution, we will measure the response rate for each Slack cohort channel. We will use channel-specific survey links to attribute responses to their respective cohorts. The primary outcome for each Slack channel is its survey response rate:
+
+\[
+\text{Response Rate}_j =
+\frac{\text{Number of survey respondents in channel }j}
+{\text{Number of eligible members in channel }j}.
+\]
+
+The primary treatment-effect statistic is the average within-pair difference in response rates:
+
+\[
+T =
+\frac{1}{P}
+\sum_{p=1}^{P}
+\left(
+\text{Response Rate}_{AI,p}
+-
+\text{Response Rate}_{Control,p}
+\right),
+\]
+
+where \(P\) is the number of matched pairs included in the experiment. Each matched pair contributes equally to this statistic regardless of the number of eligible members in its Slack channels.
+
+The primary hypothesis test uses matched-pair randomization inference. Under the sharp null hypothesis that the AI-authored survey invitation has no effect on survey response for any cohort, the AI and control labels can be swapped within each matched pair. With all 12 matched pairs, there are
+
+\[
+2^{12} = 4,096
+\]
+
+treatment assignments consistent with the experimental design. For each allowable assignment, the same average within-pair difference statistic is calculated. The two-sided randomization-inference p-value is the proportion of allowable assignments that produce an absolute test statistic at least as large as the observed absolute test statistic.
+
+
+### Slack Channels and Matched Pairs
+
+The observed Slack channel membership counts include an estimated two non-student channel administrators, which we subtract from each channel to estimate the number of eligible cohort members used in the randomization summaries and power analysis.
+
+Within each program, adjacent cohorts are paired by recency. Pair 1 contains Fall 2026 and Summer 2026, Pair 2 contains Spring 2026 and Fall 2025, Pair 3 contains Summer 2025 and Spring 2025, and so on.
+
+For descriptive covariate-balance summaries, cohort age is measured in academic terms beginning with Fall 2026. Fall 2026 has an age of 1 term, Summer 2026 has an age of 2 terms, Spring 2026 has an age of 3 terms, and so on through Spring 2023, which has an age of 12 terms.
+
+```{r design-data, include=FALSE}
+channel_sizes <- tribble(
+  ~year, ~term,     ~mids, ~mics,
+   2026, "Fall",       41,    22,
+   2026, "Summer",     34,    10,
+   2026, "Spring",     67,    32,
+   2025, "Fall",       95,    44,
+   2025, "Summer",     59,    13,
+   2025, "Spring",     51,    30,
+   2024, "Fall",       77,    27,
+   2024, "Summer",     38,    22,
+   2024, "Spring",     66,    41,
+   2023, "Fall",      145,    48,
+   2023, "Summer",     53,    12,
+   2023, "Spring",     83,    17
+)
+
+channel_sizes <- channel_sizes %>%
+  mutate(
+    mids = mids - 2,
+    mics = mics - 2,
+    cohort_age_terms = row_number()
+  )
+
+cohort_labels <- paste(channel_sizes$term, channel_sizes$year)
+
+pair_template <- tibble(
+  pair_within_program = 1:6,
+  cohort_1 = cohort_labels[c(1, 3, 5, 7, 9, 11)],
+  cohort_2 = cohort_labels[c(2, 4, 6, 8, 10, 12)]
+)
+
+mids_pairs <- pair_template %>%
+  mutate(
+    program = "MIDS",
+    n_1 = channel_sizes$mids[c(1, 3, 5, 7, 9, 11)],
+    n_2 = channel_sizes$mids[c(2, 4, 6, 8, 10, 12)],
+    age_1 = channel_sizes$cohort_age_terms[c(1, 3, 5, 7, 9, 11)],
+    age_2 = channel_sizes$cohort_age_terms[c(2, 4, 6, 8, 10, 12)]
+  )
+
+mics_pairs <- pair_template %>%
+  mutate(
+    program = "MICS",
+    n_1 = channel_sizes$mics[c(1, 3, 5, 7, 9, 11)],
+    n_2 = channel_sizes$mics[c(2, 4, 6, 8, 10, 12)],
+    age_1 = channel_sizes$cohort_age_terms[c(1, 3, 5, 7, 9, 11)],
+    age_2 = channel_sizes$cohort_age_terms[c(2, 4, 6, 8, 10, 12)]
+  )
+
+pair_data <- bind_rows(mids_pairs, mics_pairs) %>%
+  mutate(
+    program = factor(program, levels = c("MIDS", "MICS"))
+  ) %>%
+  arrange(program, pair_within_program)
+```
+
+```{r channel-size-table}
+channel_sizes %>%
+  transmute(
+    Year = year,
+    Term = term,
+    MIDS = mids,
+    MICS = mics
+  ) %>%
+  kable(
+    align = "llcc",
+    caption = "Estimated eligible Slack cohort members used in the experiment"
+  )
+```
+
+```{r pair-table}
+pair_data %>%
+  transmute(
+    Program = program,
+    Pair = pair_within_program,
+    `Cohort 1` = paste0("\\mbox{", cohort_1, "}"),
+    `\\shortstack{Cohort 1 eligible\\\\members}` = n_1,
+    `Cohort 2` = paste0("\\mbox{", cohort_2, "}"),
+    `\\shortstack{Cohort 2 eligible\\\\members}` = n_2
+  ) %>%
+  kable(
+    align = "lclclc",
+    escape = FALSE,
+    caption = "Matched pairs used for treatment randomization"
+  )
+```
+
+
+## Random Assignment
+
+The actual treatment assignment is generated using a prespecified random seed. Within each matched pair, exactly one Slack channel is assigned to Test (AI) and the other to Control (Human). Because matching is performed separately within MIDS and MICS, the design guarantees 6 MIDS and 6 MICS channels in each treatment arm.
+
+```{r treatment-randomization}
+assignment_seed <- 241L
+set.seed(assignment_seed)
+
+assignment_by_pair <- pair_data %>%
+  mutate(
+    test_is_cohort_1 = rbinom(n(), size = 1, prob = 0.5) == 1,
+    assignment_1 = if_else(test_is_cohort_1, "Test (AI)", "Control (Human)"),
+    assignment_2 = if_else(test_is_cohort_1, "Control (Human)", "Test (AI)")
+  )
+
+assignment_table <- bind_rows(
+  assignment_by_pair %>%
+    transmute(
+      Program = program,
+      Pair = pair_within_program,
+      Cohort = cohort_1,
+      `Cohort age (terms)` = age_1,
+      `Estimated Eligible Members` = n_1,
+      Assignment = assignment_1
+    ),
+  assignment_by_pair %>%
+    transmute(
+      Program = program,
+      Pair = pair_within_program,
+      Cohort = cohort_2,
+      `Cohort age (terms)` = age_2,
+      `Estimated Eligible Members` = n_2,
+      Assignment = assignment_2
+    )
+) %>%
+  mutate(
+    `Channel ID` = if_else(
+      Program == "MIDS",
+      `Cohort age (terms)`,
+      `Cohort age (terms)` + 12
+    )
+  ) %>%
+  arrange(`Channel ID`) %>%
+  select(
+    `Channel ID`,
+    Program,
+    Pair,
+    Cohort,
+    Assignment,
+    `Cohort age (terms)`,
+    `Estimated Eligible Members`
+  )
+
+pair_check <- assignment_table %>%
+  count(Program, Pair, Assignment) %>%
+  pivot_wider(
+    names_from = Assignment,
+    values_from = n,
+    values_fill = 0
+  )
+
+stopifnot(
+  all(pair_check$`Test (AI)` == 1),
+  all(pair_check$`Control (Human)` == 1),
+  sum(assignment_table$Assignment == "Test (AI)") == 12,
+  sum(assignment_table$Assignment == "Control (Human)") == 12
+)
+
+expected_assignment <- c(
+  "Test (AI)",
+  "Control (Human)",
+  "Control (Human)",
+  "Test (AI)",
+  "Control (Human)",
+  "Test (AI)",
+  "Test (AI)",
+  "Control (Human)",
+  "Test (AI)",
+  "Control (Human)",
+  "Test (AI)",
+  "Control (Human)",
+  "Test (AI)",
+  "Control (Human)",
+  "Control (Human)",
+  "Test (AI)",
+  "Test (AI)",
+  "Control (Human)",
+  "Control (Human)",
+  "Test (AI)",
+  "Test (AI)",
+  "Control (Human)",
+  "Test (AI)",
+  "Control (Human)"
+)
+
+stopifnot(
+  all(assignment_table$`Channel ID` == 1:24),
+  identical(
+    as.character(assignment_table$Assignment),
+    expected_assignment
+  )
+)
+
+assignment_table_display <- assignment_table %>%
+  arrange(Program, `Channel ID`) %>%
+  mutate(
+    Cohort = paste0("\\mbox{", Cohort, "}"),
+    Assignment = paste0("\\mbox{", Assignment, "}")
+  ) %>%
+  rename(
+    `\\shortstack{Estimated Eligible\\\\Members}` =
+      `Estimated Eligible Members`
+  )
+
+kable(
+  assignment_table_display,
+  align = "ccclccc",
+  escape = FALSE,
+  caption = paste0(
+    "Final randomized treatment assignment (seed = ",
+    assignment_seed,
+    ")"
+  )
+)
+```
+
+
+### Randomization Check and Covariate Balance
+
+The program counts are exactly balanced by design, with six MIDS and six MICS channels in each treatment arm. Cohort age and estimated eligible cohort size are also fairly balanced confirming that the blocking and randomization process worked correctly.
+
+```{r assignment-summary}
+balance_summary <- assignment_table %>%
+  group_by(Assignment) %>%
+  summarise(
+    `MIDS channels` = sum(Program == "MIDS"),
+    `MICS channels` = sum(Program == "MICS"),
+    `Average cohort age (terms)` = mean(`Cohort age (terms)`),
+    `Average estimated eligible cohort size` =
+      mean(`Estimated Eligible Members`),
+    .groups = "drop"
+  )
+
+ai_summary <- balance_summary %>%
+  filter(Assignment == "Test (AI)")
+
+control_summary <- balance_summary %>%
+  filter(Assignment == "Control (Human)")
+
+balance_difference <- tibble(
+  Assignment = "Test (AI) - Control (Human)",
+  `MIDS channels` =
+    ai_summary$`MIDS channels` - control_summary$`MIDS channels`,
+  `MICS channels` =
+    ai_summary$`MICS channels` - control_summary$`MICS channels`,
+  `Average cohort age (terms)` =
+    ai_summary$`Average cohort age (terms)` -
+    control_summary$`Average cohort age (terms)`,
+  `Average estimated eligible cohort size` =
+    ai_summary$`Average estimated eligible cohort size` -
+    control_summary$`Average estimated eligible cohort size`
+)
+
+percent_difference <- tibble(
+  Assignment = "% Difference",
+  `MIDS channels` =
+    100 * (
+      ai_summary$`MIDS channels` -
+      control_summary$`MIDS channels`
+    ) / control_summary$`MIDS channels`,
+  `MICS channels` =
+    100 * (
+      ai_summary$`MICS channels` -
+      control_summary$`MICS channels`
+    ) / control_summary$`MICS channels`,
+  `Average cohort age (terms)` =
+    100 * (
+      ai_summary$`Average cohort age (terms)` -
+      control_summary$`Average cohort age (terms)`
+    ) / control_summary$`Average cohort age (terms)`,
+  `Average estimated eligible cohort size` =
+    100 * (
+      ai_summary$`Average estimated eligible cohort size` -
+      control_summary$`Average estimated eligible cohort size`
+    ) / control_summary$`Average estimated eligible cohort size`
+)
+
+balance_table <- bind_rows(
+  balance_summary,
+  balance_difference,
+  percent_difference
+)
+
+balance_table_display <- balance_table %>%
+  mutate(
+    `MIDS channels` = if_else(
+      Assignment == "% Difference",
+      paste0(round(`MIDS channels`, 1), "%"),
+      as.character(round(`MIDS channels`, 1))
+    ),
+    `MICS channels` = if_else(
+      Assignment == "% Difference",
+      paste0(round(`MICS channels`, 1), "%"),
+      as.character(round(`MICS channels`, 1))
+    ),
+    `Average cohort age (terms)` = if_else(
+      Assignment == "% Difference",
+      paste0(round(`Average cohort age (terms)`, 1), "%"),
+      as.character(round(`Average cohort age (terms)`, 2))
+    ),
+    `Average estimated eligible cohort size` = if_else(
+      Assignment == "% Difference",
+      paste0(round(`Average estimated eligible cohort size`, 1), "%"),
+      as.character(round(`Average estimated eligible cohort size`, 1))
+    )
+  )
+
+kable(
+  balance_table_display,
+  align = "lcccc",
+  caption = "Covariate balance between Test (AI) and Control (Human) assignments"
+)
+```
+
+## Power Analysis
+
+Power is defined as the probability that the matched-pair randomization-inference procedure rejects the null hypothesis at \(\alpha = 0.05\) when a true AI-authorship effect exists. The power analysis uses the same Slack channels, matched-pair structure, and estimated eligible cohort sizes defined above.
+
+
+### Assumptions and Effect-Size Scenarios
+
+We use a 10% response rate in the control condition as a conservative planning assumption. This is intentionally lower than response rates observed in official university survey efforts because our survey invitation will be sent by students rather than by an official school or university office. For context, Oregon State University's Fall 2025 Student Experience Survey reported a 35% response rate, while Clasing-Manquian and Gonzalez (2025) report approximately a 25% response rate in a randomized web-survey experiment of U.S. doctoral students.
+
+Gu et al. (2026) provide evidence that AI-generated messaging can produce positive behavioral effects. In their randomized field experiment, AI-generated promotional messages improved purchasing behavior relative to human-generated messages. Because their outcome and setting differ from our student survey, we do not treat their reported effects as direct estimates of the effect on survey response. Instead, we examine three sensitivity scenarios representing small, moderate, and large improvements in survey response: +1, +4, and +8 percentage points.
+
+```{r simulation-setup, include=FALSE}
+set.seed(123)
+
+alpha <- 0.05
+n_sims <- 3000L
+
+pairs_per_program_values <- 2:6
+total_channels_values <- 4 * pairs_per_program_values
+
+scenarios <- tibble(
+  scenario = factor(
+    c("Small", "Moderate", "Large"),
+    levels = c("Small", "Moderate", "Large")
+  ),
+  p_control = c(0.10, 0.10, 0.10),
+  p_ai = c(0.11, 0.14, 0.18)
+) %>%
+  mutate(
+    effect_ai_pp = 100 * (p_ai - p_control)
+  )
+
+# Preserve the existing simulation row order for reproducibility of the
+# Monte Carlo results while using the same canonical design data above.
+simulation_pair_data <- pair_data %>%
+  arrange(as.character(program), pair_within_program)
+
+make_sign_matrix <- function(n_pairs) {
+  as.matrix(
+    expand.grid(
+      rep(list(c(-1, 1)), n_pairs)
+    )
+  )
+}
+
+total_pairs_values <- 2 * pairs_per_program_values
+
+sign_matrices <- setNames(
+  lapply(total_pairs_values, make_sign_matrix),
+  total_pairs_values
+)
+```
+
+```{r scenario-table}
+scenario_table <- scenarios %>%
+  transmute(
+    Scenario = scenario,
+    `Human control` = paste0(round(100 * p_control), "%"),
+    AI = paste0(round(100 * p_ai), "%"),
+    `AI effect` = paste0("+", effect_ai_pp, " pp")
+  )
+
+kable(
+  scenario_table,
+  align = "lccc",
+  caption = "Response probabilities used in the three power-analysis scenarios"
+)
+```
+
+
+### Simulation Method
+
+For each effect-size scenario and each number of Slack channels, we simulate `r format(n_sims, big.mark = ",")` independent experiments. The simulation preserves the planned blocked design by including equal numbers of matched pairs from MIDS and MICS. The evaluated designs contain 8, 12, 16, 20, and 24 total Slack channels, corresponding to 4, 6, 8, 10, and 12 matched pairs.
+
+As the number of channels increases, the simulation adds older matched cohort pairs while maintaining equal representation from MIDS and MICS. For example, the 8-channel design contains the two most recent matched pairs from each program, while the 24-channel design contains all six matched pairs from each program.
+
+Within each matched pair, one channel is randomly assigned to the AI-authored treatment and the other to the human-authored control. Survey responses are generated using a binomial distribution based on the estimated number of eligible members in each channel and the response probability for that channel's assigned condition. The channel response rate is then calculated as the simulated number of respondents divided by the estimated number of eligible members in that channel.
+
+For each simulated experiment, the test statistic is the average of the within-pair AI-minus-control response-rate differences. The exact randomization-inference p-value is calculated by considering every allowable within-pair treatment-label swap. A simulation counts as a rejection when the two-sided p-value is less than or equal to `r alpha`. Estimated power is the proportion of simulated experiments that reject the null.
+
+Because the exact two-sided randomization test has a discrete set of possible p-values, a design with only 4 matched pairs (8 channels) cannot reject at the 0.05 level. With 4 pairs there are only \(2^4 = 16\) allowable assignments, and the smallest attainable two-sided p-value is \(2/16 = 0.125\). Therefore, simulated power at 8 channels is necessarily 0%, regardless of effect size.
+
+```{r simulation-code, include=FALSE}
+simulate_once <- function(
+    pair_subset,
+    p_control,
+    p_ai,
+    sign_matrix
+) {
+
+  n_pairs <- nrow(pair_subset)
+  pair_differences <- numeric(n_pairs)
+
+  for (j in seq_len(n_pairs)) {
+
+    ai_is_channel_1 <- rbinom(1, size = 1, prob = 0.5) == 1
+
+    if (ai_is_channel_1) {
+
+      responses_1 <- rbinom(
+        1,
+        size = pair_subset$n_1[j],
+        prob = p_ai
+      )
+
+      responses_2 <- rbinom(
+        1,
+        size = pair_subset$n_2[j],
+        prob = p_control
+      )
+
+      rate_ai <- responses_1 / pair_subset$n_1[j]
+      rate_control <- responses_2 / pair_subset$n_2[j]
+
+    } else {
+
+      responses_1 <- rbinom(
+        1,
+        size = pair_subset$n_1[j],
+        prob = p_control
+      )
+
+      responses_2 <- rbinom(
+        1,
+        size = pair_subset$n_2[j],
+        prob = p_ai
+      )
+
+      rate_control <- responses_1 / pair_subset$n_1[j]
+      rate_ai <- responses_2 / pair_subset$n_2[j]
+    }
+
+    pair_differences[j] <- rate_ai - rate_control
+  }
+
+  t_observed <- mean(pair_differences)
+
+  permutation_statistics <- as.vector(
+    sign_matrix %*% pair_differences
+  ) / n_pairs
+
+  p_value <- mean(
+    abs(permutation_statistics) >= abs(t_observed) - 1e-12
+  )
+
+  return(p_value)
+}
+
+
+results_list <- list()
+row_id <- 1L
+
+for (s in seq_len(nrow(scenarios))) {
+
+  for (pairs_per_program in pairs_per_program_values) {
+
+    pair_subset <- simulation_pair_data %>%
+      filter(pair_within_program <= pairs_per_program)
+
+    n_pairs <- nrow(pair_subset)
+    n_channels <- 2 * n_pairs
+
+    sign_matrix <- sign_matrices[[as.character(n_pairs)]]
+
+    p_values <- replicate(
+      n_sims,
+      simulate_once(
+        pair_subset = pair_subset,
+        p_control = scenarios$p_control[s],
+        p_ai = scenarios$p_ai[s],
+        sign_matrix = sign_matrix
+      )
+    )
+
+    results_list[[row_id]] <- tibble(
+      scenario = scenarios$scenario[s],
+      total_channels = n_channels,
+      matched_pairs = n_pairs,
+      total_members = sum(pair_subset$n_1 + pair_subset$n_2),
+      power = mean(p_values <= alpha),
+      valid_simulations = length(p_values)
+    )
+
+    row_id <- row_id + 1L
+  }
+}
+
+power_results <- bind_rows(results_list)
+```
+
+
+### Results
+
+```{r power-plot}
+ggplot(
+  power_results,
+  aes(
+    x = total_channels,
+    y = power,
+    group = scenario,
+    linetype = scenario,
+    shape = scenario
+  )
+) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 2.2) +
+  scale_y_continuous(
+    limits = c(0, 1.0),
+    breaks = seq(0, 1.0, by = 0.20),
+    labels = function(x) paste0(round(100 * x), "%")
+  ) +
+  scale_x_continuous(
+    breaks = total_channels_values
+  ) +
+  labs(
+    title = "Simulated Power by Number of Slack Channels",
+    subtitle = "Matched-pair randomization inference",
+    x = "Total number of Slack channels",
+    y = "Power",
+    linetype = "Scenario",
+    shape = "Scenario"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
+```
+
+```{r max-sample-table}
+max_channels <- max(total_channels_values)
+
+max_sample_results <- power_results %>%
+  filter(total_channels == max_channels) %>%
+  mutate(
+    `Estimated power` = paste0(round(100 * power, 1), "%")
+  ) %>%
+  select(
+    Scenario = scenario,
+    `Slack channels` = total_channels,
+    `Matched pairs` = matched_pairs,
+    `Total estimated eligible members` = total_members,
+    `Estimated power`
+  )
+
+kable(
+  max_sample_results,
+  align = "lcccc",
+  caption = "Estimated power using all 24 Slack cohort channels"
+)
+```
+
+The simulations indicate that the planned 24-channel design has limited power to detect small or moderate improvements in survey response. Under the large-effect scenario (+8 percentage points), estimated power is `r paste0(round(100 * power_results$power[power_results$total_channels == max_channels & power_results$scenario == "Large"], 1), "%")`, which approaches the conventional 80% power benchmark.
+
+
+## Practical Considerations
+
+We do not plan to conduct a separate student-facing pilot in order to minimize survey fatigue and avoid unnecessarily burdening students with multiple survey requests.
+
+To ensure that the experiment also provides practical value to the university, we plan to share aggregated survey findings on preferred class times with appropriate university administrators and student representatives. These findings could help inform future class-scheduling decisions and better align class offerings with student preferences.
+
+
+## Conclusion
+
+The final design uses 24 Slack cohort channels organized into 12 recency-matched pairs within MIDS and MICS. Treatment is randomized within each pair, and the primary analysis will use exact matched-pair randomization inference on channel-level response rates. The design guarantees exact balance on program, while the realized assignment is also summarized descriptively with respect to cohort age and estimated eligible cohort size.
+
+Using all `r max_channels` Slack channels (`r max_channels / 2` matched pairs), simulated power is `r paste0(round(100 * power_results$power[power_results$total_channels == max_channels & power_results$scenario == "Small"], 1), "%")` in the small-effect scenario (+1 percentage point), `r paste0(round(100 * power_results$power[power_results$total_channels == max_channels & power_results$scenario == "Moderate"], 1), "%")` in the moderate-effect scenario (+4 percentage points), and `r paste0(round(100 * power_results$power[power_results$total_channels == max_channels & power_results$scenario == "Large"], 1), "%")` in the large-effect scenario (+8 percentage points). These simulations indicate that the design is unlikely to reliably detect small or moderate effects, while a large effect would be detected with power approaching 80%.
+
+
+## References
+
+Clasing-Manquian, P., & Gonzalez, J. (2025). The effect of communication emails on web survey response rate, representativeness, and response bias: Results from a factorial randomized control trial in a college student population. *Field Methods, 37*(4), 291-304. https://doi.org/10.1177/1525822X241286341
+
+Gu, W., Liu, Y., Shan, G., & Gu, B. (2026). *When machines persuade better than humans: Generative AI, cognitive constraints, and promotional effectiveness*. SSRN. https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6294798
+
+Hohenstein, J., & Jung, M. (2020). AI as a moral crumple zone: The effects of AI-mediated communication on attribution and trust. *Computers in Human Behavior, 106*, 106190. https://doi.org/10.1016/j.chb.2019.106190
+
+Oregon State University, Office of Undergraduate Education. (2025). *Fall Student Experience Survey*. https://academicaffairs.oregonstate.edu/office-undergraduate-education/fall-student-experience-survey
+
+Purcell, Z. A., Jakesch, M., Dong, M., Nussberger, A.-M., & Köbis, N. (2025). Writing with AI boosts trust-building efficiency. *iScience, 28*(12), 114092. https://doi.org/10.1016/j.isci.2025.114092
