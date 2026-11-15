@@ -15,6 +15,7 @@ knitr::opts_chunk$set(
 
 library(tidyverse)
 library(knitr)
+library(kableExtra)
 ```
 
 
@@ -136,34 +137,65 @@ pair_data <- bind_rows(mids_pairs, mics_pairs) %>%
   arrange(program, pair_within_program)
 ```
 
-```{r channel-size-table}
-channel_sizes %>%
-  transmute(
-    Year = year,
-    Term = term,
-    MIDS = mids,
-    MICS = mics
-  ) %>%
-  kable(
-    align = "llcc",
-    caption = "Estimated eligible Slack cohort members used in the experiment"
-  )
-```
 
 ```{r pair-table}
-pair_data %>%
-  transmute(
-    Program = program,
-    Pair = pair_within_program,
-    `Cohort 1` = paste0("\\mbox{", cohort_1, "}"),
-    `\\shortstack{Cohort 1 eligible\\\\members}` = n_1,
-    `Cohort 2` = paste0("\\mbox{", cohort_2, "}"),
-    `\\shortstack{Cohort 2 eligible\\\\members}` = n_2
+channel_roster_table <- bind_rows(
+  pair_data %>%
+    transmute(
+      Program = program,
+      Pair = pair_within_program,
+      Cohort = cohort_1,
+      `Cohort age (terms)` = age_1,
+      `Estimated Eligible Members` = n_1
+    ),
+  pair_data %>%
+    transmute(
+      Program = program,
+      Pair = pair_within_program,
+      Cohort = cohort_2,
+      `Cohort age (terms)` = age_2,
+      `Estimated Eligible Members` = n_2
+    )
+) %>%
+  mutate(
+    `Channel ID` = if_else(
+      Program == "MIDS",
+      `Cohort age (terms)`,
+      `Cohort age (terms)` + 12
+    )
   ) %>%
-  kable(
-    align = "lclclc",
-    escape = FALSE,
-    caption = "Matched pairs used for treatment randomization"
+  arrange(`Channel ID`) %>%
+  select(
+    `Channel ID`,
+    Program,
+    Pair,
+    Cohort,
+    `Cohort age (terms)`,
+    `Estimated Eligible Members`
+  )
+
+channel_roster_display <- channel_roster_table %>%
+  mutate(
+    Cohort = paste0("\\mbox{", Cohort, "}")
+  ) %>%
+  rename(
+    `\\shortstack{Cohort age\\\\(terms)}` =
+      `Cohort age (terms)`,
+    `\\shortstack{Est. Eligible\\\\Members}` =
+      `Estimated Eligible Members`
+  )
+
+kable(
+  channel_roster_display,
+  format = "latex",
+  booktabs = TRUE,
+  align = "ccclcc",
+  escape = FALSE,
+  caption = "Slack cohort channel matched pairs used for treatment randomization"
+) %>%
+  kable_styling(
+    latex_options = "HOLD_position",
+    position = "center"
   )
 ```
 
@@ -278,12 +310,16 @@ assignment_table_display <- assignment_table %>%
     Assignment = paste0("\\mbox{", Assignment, "}")
   ) %>%
   rename(
-    `\\shortstack{Estimated Eligible\\\\Members}` =
+    `\\shortstack{Cohort age\\\\(terms)}` =
+      `Cohort age (terms)`,
+    `\\shortstack{Est. Eligible\\\\Members}` =
       `Estimated Eligible Members`
   )
 
 kable(
   assignment_table_display,
+  format = "latex",
+  booktabs = TRUE,
   align = "ccclccc",
   escape = FALSE,
   caption = paste0(
@@ -291,7 +327,11 @@ kable(
     assignment_seed,
     ")"
   )
-)
+) %>%
+  kable_styling(
+    latex_options = "HOLD_position",
+    position = "center"
+  )
 ```
 
 
@@ -305,8 +345,8 @@ balance_summary <- assignment_table %>%
   summarise(
     `MIDS channels` = sum(Program == "MIDS"),
     `MICS channels` = sum(Program == "MICS"),
-    `Average cohort age (terms)` = mean(`Cohort age (terms)`),
-    `Average estimated eligible cohort size` =
+    `Avg cohort age (terms)` = mean(`Cohort age (terms)`),
+    `Avg estimated eligible cohort size` =
       mean(`Estimated Eligible Members`),
     .groups = "drop"
   )
@@ -318,17 +358,17 @@ control_summary <- balance_summary %>%
   filter(Assignment == "Control (Human)")
 
 balance_difference <- tibble(
-  Assignment = "Test (AI) - Control (Human)",
+  Assignment = "Diff. (Test - Control)",
   `MIDS channels` =
     ai_summary$`MIDS channels` - control_summary$`MIDS channels`,
   `MICS channels` =
     ai_summary$`MICS channels` - control_summary$`MICS channels`,
-  `Average cohort age (terms)` =
-    ai_summary$`Average cohort age (terms)` -
-    control_summary$`Average cohort age (terms)`,
-  `Average estimated eligible cohort size` =
-    ai_summary$`Average estimated eligible cohort size` -
-    control_summary$`Average estimated eligible cohort size`
+  `Avg cohort age (terms)` =
+    ai_summary$`Avg cohort age (terms)` -
+    control_summary$`Avg cohort age (terms)`,
+  `Avg estimated eligible cohort size` =
+    ai_summary$`Avg estimated eligible cohort size` -
+    control_summary$`Avg estimated eligible cohort size`
 )
 
 percent_difference <- tibble(
@@ -343,16 +383,16 @@ percent_difference <- tibble(
       ai_summary$`MICS channels` -
       control_summary$`MICS channels`
     ) / control_summary$`MICS channels`,
-  `Average cohort age (terms)` =
+  `Avg cohort age (terms)` =
     100 * (
-      ai_summary$`Average cohort age (terms)` -
-      control_summary$`Average cohort age (terms)`
-    ) / control_summary$`Average cohort age (terms)`,
-  `Average estimated eligible cohort size` =
+      ai_summary$`Avg cohort age (terms)` -
+      control_summary$`Avg cohort age (terms)`
+    ) / control_summary$`Avg cohort age (terms)`,
+  `Avg estimated eligible cohort size` =
     100 * (
-      ai_summary$`Average estimated eligible cohort size` -
-      control_summary$`Average estimated eligible cohort size`
-    ) / control_summary$`Average estimated eligible cohort size`
+      ai_summary$`Avg estimated eligible cohort size` -
+      control_summary$`Avg estimated eligible cohort size`
+    ) / control_summary$`Avg estimated eligible cohort size`
 )
 
 balance_table <- bind_rows(
@@ -373,23 +413,40 @@ balance_table_display <- balance_table %>%
       paste0(round(`MICS channels`, 1), "%"),
       as.character(round(`MICS channels`, 1))
     ),
-    `Average cohort age (terms)` = if_else(
+    `Avg cohort age (terms)` = if_else(
       Assignment == "% Difference",
-      paste0(round(`Average cohort age (terms)`, 1), "%"),
-      as.character(round(`Average cohort age (terms)`, 2))
+      paste0(round(`Avg cohort age (terms)`, 1), "%"),
+      as.character(round(`Avg cohort age (terms)`, 2))
     ),
-    `Average estimated eligible cohort size` = if_else(
+    `Avg estimated eligible cohort size` = if_else(
       Assignment == "% Difference",
-      paste0(round(`Average estimated eligible cohort size`, 1), "%"),
-      as.character(round(`Average estimated eligible cohort size`, 1))
+      paste0(round(`Avg estimated eligible cohort size`, 1), "%"),
+      as.character(round(`Avg estimated eligible cohort size`, 1))
     )
   )
 
+balance_table_transposed <- balance_table_display %>%
+  pivot_longer(
+    cols = -Assignment,
+    names_to = "Metric",
+    values_to = "Value"
+  ) %>%
+  pivot_wider(
+    names_from = Assignment,
+    values_from = Value
+  )
+
 kable(
-  balance_table_display,
+  balance_table_transposed,
+  format = "latex",
+  booktabs = TRUE,
   align = "lcccc",
   caption = "Covariate balance between Test (AI) and Control (Human) assignments"
-)
+) %>%
+  kable_styling(
+    latex_options = "HOLD_position",
+    position = "center"
+  )
 ```
 
 ## Power Analysis
@@ -411,6 +468,7 @@ n_sims <- 3000L
 
 pairs_per_program_values <- 2:6
 total_channels_values <- 4 * pairs_per_program_values
+max_channels <- max(total_channels_values)
 
 scenarios <- tibble(
   scenario = factor(
@@ -598,6 +656,20 @@ ggplot(
 ) +
   geom_line(linewidth = 0.9) +
   geom_point(size = 2.2) +
+  scale_linetype_discrete(
+    labels = c(
+      "Small (+1 pp)",
+      "Moderate (+4 pp)",
+      "Large (+8 pp)"
+    )
+  ) +
+  scale_shape_discrete(
+    labels = c(
+      "Small (+1 pp)",
+      "Moderate (+4 pp)",
+      "Large (+8 pp)"
+    )
+  ) +
   scale_y_continuous(
     limits = c(0, 1.0),
     breaks = seq(0, 1.0, by = 0.20),
@@ -620,29 +692,6 @@ ggplot(
     plot.title = element_text(face = "bold", hjust = 0.5),
     plot.subtitle = element_text(hjust = 0.5)
   )
-```
-
-```{r max-sample-table}
-max_channels <- max(total_channels_values)
-
-max_sample_results <- power_results %>%
-  filter(total_channels == max_channels) %>%
-  mutate(
-    `Estimated power` = paste0(round(100 * power, 1), "%")
-  ) %>%
-  select(
-    Scenario = scenario,
-    `Slack channels` = total_channels,
-    `Matched pairs` = matched_pairs,
-    `Total estimated eligible members` = total_members,
-    `Estimated power`
-  )
-
-kable(
-  max_sample_results,
-  align = "lcccc",
-  caption = "Estimated power using all 24 Slack cohort channels"
-)
 ```
 
 The simulations indicate that the planned 24-channel design has limited power to detect small or moderate improvements in survey response. Under the large-effect scenario (+8 percentage points), estimated power is `r paste0(round(100 * power_results$power[power_results$total_channels == max_channels & power_results$scenario == "Large"], 1), "%")`, which approaches the conventional 80% power benchmark.
